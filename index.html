@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Latihan TIK - Ayo Menyalin Teks | SLB Insan Madani Metro</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <!-- DEKORASI BACKGROUND LINGKUNGAN APLIKASI -->
+  <div class="bg-decorations" aria-hidden="true">
+    <div class="shape shape-1"></div>
+    <div class="shape shape-2"></div>
+    <div class="shape shape-3"></div>
+  </div>
+
+  <div id="app-viewport" class="app-viewport">
+    <!-- APP HEADER DEFAULT -->
+    <header class="app-header">
+      <div class="header-brand">
+        <span class="brand-icon">💻</span>
+        <div class="brand-text">
+          <span class="brand-title">LATIHAN TIK</span>
+          <span class="brand-sub">SLB INSAN MADANI METRO</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- MAIN CONTAINER APLIKASI -->
+    <main id="main-content" class="app-body">
+
+      <!-- ==========================================
+           1. MENU UTAMA (HOME)
+           ========================================== -->
+      <section id="view-home" class="view-panel active">
+        <div class="home-composition">
+          <div class="hero-illustration-box">
+            <svg class="tik-illustration" viewBox="0 0 200 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="25" y="15" width="150" height="100" rx="12" fill="#FFFFFF" stroke="#6C5CE7" stroke-width="6"/>
+              <rect x="35" y="25" width="130" height="80" rx="6" fill="#F3F0FF"/>
+              <path d="M85 115 H115 V130 H85 Z" fill="#A29BFE"/>
+              <rect x="70" y="130" width="60" height="8" rx="4" fill="#6C5CE7"/>
+              <rect x="50" y="40" width="70" height="50" rx="4" fill="#FFFFFF" stroke="#A29BFE" stroke-width="3"/>
+              <line x1="60" y1="52" x2="105" y2="52" stroke="#6C5CE7" stroke-width="4" stroke-linecap="round"/>
+              <line x1="60" y1="64" x2="95" y2="64" stroke="#A29BFE" stroke-width="4" stroke-linecap="round"/>
+              <line x1="60" y1="76" x2="85" y2="76" stroke="#00B894" stroke-width="4" stroke-linecap="round"/>
+              <rect x="130" y="65" width="22" height="18" rx="3" fill="#6C5CE7"/>
+              <path d="M136 74 L146 74 M141 69 L141 79" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </div>
+
+          <div class="hero-text-box">
+            <h1 class="main-title">Ayo Menyalin Teks</h1>
+            <p class="main-desc">Latihan membaca dan menyalin teks dengan rapi, teliti, dan mandiri.</p>
+          </div>
+
+          <div class="primary-action-area">
+            <button class="btn btn-primary btn-start" onclick="navigateTo('view-absensi')">
+              <span class="btn-icon">▶</span> MULAI & ABSENSI
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           2. ABSENSI SISWA
+           ========================================== -->
+      <section id="view-absensi" class="view-panel">
+        <div class="panel-card">
+          <div class="card-header">
+            <h2>📋 ABSENSI SISWA</h2>
+            <p class="card-subtitle">Pilih nama kamu untuk memulai sesi latihan.</p>
+          </div>
+
+          <div class="card-body">
+            <div class="form-group">
+              <label for="student-select">Nama Siswa:</label>
+              <select id="student-select" class="form-control" onchange="handleStudentSelect()">
+                <option value="">-- Pilih Nama --</option>
+              </select>
+            </div>
+
+            <div id="absensi-details" class="info-banner hidden">
+              <div class="info-row">
+                <span class="info-label">Kelas:</span>
+                <span class="info-value">SMPLB - SMALB</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Tanggal:</span>
+                <span id="absensi-date" class="info-value">-</span>
+              </div>
+            </div>
+
+            <div id="absensi-empty-msg" class="alert-box hidden">
+              <p>⚠️ Belum ada data siswa. Silakan minta guru untuk menambahkan nama kamu di Menu Guru.</p>
+            </div>
+          </div>
+
+          <div class="card-footer">
+            <button id="btn-start-session" class="btn btn-primary" onclick="startExerciseSession()" disabled>
+              MULAI BELAJAR 🚀
+            </button>
+            <button class="btn btn-secondary" onclick="navigateTo('view-home')">
+              ← KEMBALI
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           3. BACA TEKS
+           ========================================== -->
+      <section id="view-baca" class="view-panel">
+        <div class="panel-card">
+          <div class="card-header">
+            <h2>📝 BACA TEKS</h2>
+            <p class="card-subtitle">Perhatikan teks berikut dengan teliti.</p>
+          </div>
+
+          <div class="card-body">
+            <div class="reading-container">
+              <p id="display-reading-text" class="target-text-display"></p>
+            </div>
+          </div>
+
+          <div class="card-footer">
+            <button class="btn btn-primary" onclick="navigateTo('view-ketik')">
+              SAYA SIAP MENGETIK ✍️
+            </button>
+            <button class="btn btn-secondary" onclick="navigateTo('view-absensi')">
+              ← KEMBALI
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           4. AYO MENGETIK
+           ========================================== -->
+      <section id="view-ketik" class="view-panel">
+        <div class="panel-card">
+          <div class="card-header">
+            <h2>⌨️ AYO MENGETIK</h2>
+            <p class="card-subtitle">Salin teks di bawah ini dengan teliti.</p>
+          </div>
+
+          <div class="card-body workspace-layout">
+            <div class="reference-box">
+              <span class="box-label">TEKS CONTOH:</span>
+              <p id="reference-text" class="reference-text-display"></p>
+            </div>
+
+            <div class="input-box">
+              <label for="typing-input" class="box-label">KOTAK KETIK KAMU:</label>
+              <textarea id="typing-input" class="typing-textarea" rows="4" placeholder="Mulai mengetik di sini..."></textarea>
+            </div>
+          </div>
+
+          <div class="card-footer">
+            <button class="btn btn-primary" onclick="checkTypingAnswer()">
+              ✓ PERIKSA
+            </button>
+            <button class="btn btn-secondary" onclick="navigateTo('view-baca')">
+              ← KEMBALI
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           5. HASIL LATIHAN
+           ========================================== -->
+      <section id="view-hasil" class="view-panel">
+        <div class="panel-card">
+          <div class="card-header">
+            <h2>🎉 HASIL LATIHAN</h2>
+          </div>
+
+          <div class="card-body results-container">
+            <div class="result-identity-bar">
+              <p><strong>Nama:</strong> <span id="res-nama">-</span></p>
+              <p><strong>Tanggal:</strong> <span id="res-tanggal">-</span></p>
+            </div>
+
+            <div class="result-main-feedback">
+              <div class="result-section">
+                <h3 class="result-section-title">HASIL PENILAIAN UTAMA</h3>
+                <div id="primary-feedback-list" class="feedback-list"></div>
+              </div>
+
+              <div id="retry-result-section" class="result-section hidden">
+                <hr class="section-divider">
+                <h3 class="result-section-title">LATIHAN PERBAIKAN</h3>
+                <div id="retry-feedback-list" class="feedback-list"></div>
+              </div>
+            </div>
+
+            <div class="motivation-box">
+              <span class="motivation-title">Catatan untukmu:</span>
+              <p id="res-motivation-text"></p>
+            </div>
+          </div>
+
+          <div class="card-footer">
+            <button class="btn btn-primary" onclick="finishSessionAndReset()">
+              ✓ SELESAI
+            </button>
+            <button class="btn btn-secondary" onclick="startRetrySession()">
+              🔄 LATIHAN PERBAIKAN
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           6. PETUNJUK
+           ========================================== -->
+      <section id="view-petunjuk" class="view-panel">
+        <div class="panel-card">
+          <div class="card-header">
+            <h2>📖 PETUNJUK LATIHAN</h2>
+          </div>
+          <div class="card-body">
+            <ol class="guide-steps">
+              <li>Pilih nama kamu pada menu absensi.</li>
+              <li>Mulai latihan dan baca teks dengan teliti.</li>
+              <li>Ketik kembali teks sesuai contoh di kotak yang disediakan.</li>
+              <li>Tekan tombol <strong>PERIKSA</strong> untuk melihat hasil.</li>
+              <li>Jika ada yang perlu diperbaiki, kamu boleh mencoba latihan perbaikan.</li>
+            </ol>
+            <div class="friendly-note">
+              <p>💡 <em>"Pelan-pelan dan teliti. Tidak perlu terburu-buru."</em></p>
+            </div>
+          </div>
+          <div class="card-footer">
+            <button class="btn btn-secondary" onclick="navigateTo('view-home')">
+              ← KEMBALI
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           7. TENTANG
+           ========================================== -->
+      <section id="view-tentang" class="view-panel">
+        <div class="panel-card">
+          <div class="card-header">
+            <h2>ℹ️ TENTANG APLIKASI</h2>
+          </div>
+          <div class="card-body text-center">
+            <h3>LATIHAN TIK — AYO MENYALIN TEKS</h3>
+            <p class="about-desc">
+              Aplikasi interaktif pembelajaran TIK untuk membantu siswa SMPLB-SMALB SLB Insan Madani Metro dalam berlatih membaca, mengenal struktur kalimat, menyalin teks, dan menggunakan keyboard dengan mandiri.
+            </p>
+            <div class="version-badge">Versi 1.0</div>
+          </div>
+          <div class="card-footer">
+            <button class="btn btn-secondary" onclick="navigateTo('view-home')">
+              ← KEMBALI
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           8. MENU GURU
+           ========================================== -->
+      <section id="view-guru" class="view-panel">
+        <div class="panel-card wide-card">
+          <div class="card-header">
+            <h2>👨‍🏫 MENU GURU</h2>
+          </div>
+
+          <div class="card-body">
+            <div class="teacher-tabs">
+              <button class="tab-btn active" id="tab-btn-students" onclick="switchTeacherTab('students')">👥 Data Siswa</button>
+              <button class="tab-btn" id="tab-btn-results" onclick="switchTeacherTab('results')">📊 Histori Hasil Belajar</button>
+            </div>
+
+            <!-- TAB 1: DATA SISWA -->
+            <div id="teacher-tab-students" class="tab-content active">
+              <div class="tab-action-bar">
+                <h3>DATA SISWA</h3>
+                <button class="btn btn-primary btn-sm" onclick="openStudentForm()">＋ Tambah Siswa</button>
+              </div>
+
+              <div id="student-form-box" class="form-drawer hidden">
+                <h4 id="form-title">Tambah Siswa Baru</h4>
+                <input type="hidden" id="edit-student-id">
+                
+                <div class="form-group">
+                  <label for="input-student-name">Nama Siswa:</label>
+                  <input type="text" id="input-student-name" class="form-control" placeholder="Tulis nama siswa...">
+                </div>
+
+                <div class="form-group">
+                  <label for="input-student-profile">Profil Kemampuan (Internal):</label>
+                  <select id="input-student-profile" class="form-control">
+                    <option value="A">Profil A (2 Kalimat)</option>
+                    <option value="B">Profil B (3–4 Kalimat)</option>
+                    <option value="C">Profil C (5–6 Kalimat)</option>
+                  </select>
+                </div>
+
+                <div class="form-actions">
+                  <button class="btn btn-primary btn-sm" onclick="saveStudentData()">SIMPAN</button>
+                  <button class="btn btn-secondary btn-sm" onclick="closeStudentForm()">BATAL</button>
+                </div>
+              </div>
+
+              <div class="table-wrapper">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Nama Siswa</th>
+                      <th>Profil</th>
+                      <th>Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="student-table-body">
+                    <!-- Dynamic JS -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- TAB 2: HISTORI HASIL BELAJAR -->
+            <div id="teacher-tab-results" class="tab-content">
+              <div class="tab-action-bar">
+                <h3>HISTORI HASIL BELAJAR</h3>
+              </div>
+
+              <div id="history-edit-box" class="form-drawer hidden">
+                <h4>✏️ Edit Histori Belajar</h4>
+                <input type="hidden" id="edit-history-id">
+                <div class="form-group">
+                  <label for="edit-history-student">Nama Siswa:</label>
+                  <input type="text" id="edit-history-student" class="form-control" readonly>
+                </div>
+                <div class="form-group">
+                  <label for="edit-history-primary">Penilaian Utama (Contoh: 2/2):</label>
+                  <input type="text" id="edit-history-primary" class="form-control" placeholder="Benar/Total">
+                </div>
+                <div class="form-group">
+                  <label for="edit-history-retry">Hasil Perbaikan (Isi - jika tidak ada):</label>
+                  <input type="text" id="edit-history-retry" class="form-control" placeholder="Benar/Total atau -">
+                </div>
+                <div class="form-actions">
+                  <button class="btn btn-primary btn-sm" onclick="saveHistoryEdit()">SIMPAN PERUBAHAN</button>
+                  <button class="btn btn-secondary btn-sm" onclick="closeHistoryEdit()">BATAL</button>
+                </div>
+              </div>
+
+              <div class="table-wrapper">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Tanggal</th>
+                      <th>Nama</th>
+                      <th>Jumlah Kalimat</th>
+                      <th>Penilaian Utama</th>
+                      <th>Perbaikan</th>
+                      <th>Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="results-table-body">
+                    <!-- Dynamic JS -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-footer">
+            <button class="btn btn-secondary" onclick="navigateTo('view-home')">
+              ← KEMBALI KE HOME
+            </button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- BOTTOM NAVIGATION BAR -->
+    <nav class="bottom-nav">
+      <button class="nav-item" onclick="navigateTo('view-petunjuk')">
+        <span class="nav-icon">📖</span>
+        <span class="nav-label">Petunjuk</span>
+      </button>
+      <button class="nav-item" onclick="promptTeacherPin()">
+        <span class="nav-icon">👨‍🏫</span>
+        <span class="nav-label">Menu Guru</span>
+      </button>
+      <button class="nav-item" onclick="navigateTo('view-tentang')">
+        <span class="nav-icon">ℹ️</span>
+        <span class="nav-label">Tentang</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- MODAL FORM PIN MENU GURU (MENDUKUNG CLICK & ENTER VIA FORM SUBMIT) -->
+  <div id="modal-pin" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>🔐 AKSES MENU GURU</h3>
+        <p>Masukkan PIN Guru untuk melanjutkan.</p>
+      </div>
+      <form id="teacherPinForm" onsubmit="handlePinSubmit(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <input 
+              type="password" 
+              id="pin-input" 
+              class="form-control text-center" 
+              placeholder="Masukkan PIN" 
+              maxlength="6" 
+              inputmode="numeric" 
+              pattern="[0-9]*"
+              autocomplete="off"
+            >
+          </div>
+          <p id="pin-error-msg" class="pin-error hidden">❌ PIN belum sesuai. Silakan coba kembali.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary">MASUK</button>
+          <button type="button" class="btn btn-secondary" onclick="closePinModal()">BATAL</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL DETAIL HISTORI -->
+  <div id="modal-detail" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>👁️ DETAIL HISTORI BELAJAR</h3>
+      </div>
+      <div class="modal-body text-left" id="modal-detail-content">
+        <!-- Content JS -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeDetailModal()">TUTUP</button>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

@@ -357,7 +357,7 @@ function renderFeedbackList(containerId, details) {
   });
 }
 
-fasync function saveSessionRecord() {
+async function saveSessionRecord() {
   const recordData = {
     student_id: activeSession.student.id,
     student_name: activeSession.student.name,

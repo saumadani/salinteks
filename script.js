@@ -5,6 +5,17 @@
 // PIN GURU LOKAL
 const TEACHER_PIN = "242456";
 
+// =====================================================
+// SUPABASE DATABASE
+// =====================================================
+const SUPABASE_URL = "https://wdvvpgzenpkqchgeatnd.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_SkveRAK4SAbZJltckam3Qw_G_9x5vzF";
+
+const supabaseClient = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_PUBLISHABLE_KEY
+);
+
 // 1. DATA MATERI LATIHAN TERKUNCI (PACKAGE A, B, C)
 const MATERIAL_PACKAGES = {
   A: [
@@ -41,11 +52,44 @@ let activeSession = {
 };
 
 // 3. INITIALIZATION
-document.addEventListener("DOMContentLoaded", () => {
-  loadDataFromLocalStorage();
+document.addEventListener("DOMContentLoaded", async () => {
+  await loadDataFromSupabase();
   populateAbsensiDropdown();
   renderTeacherTables();
 });
+
+async function loadDataFromSupabase() {
+  try {
+    const { data: students, error: studentError } =
+      await supabaseClient
+        .from("students")
+        .select("*")
+        .order("name", { ascending: true });
+
+    if (studentError) throw studentError;
+
+    studentsList = (students || []).map(student => ({
+      id: String(student.id),
+      name: student.name,
+      profile: student.profile || "A"
+    }));
+
+    const { data: results, error: resultError } =
+      await supabaseClient
+        .from("results")
+        .select("*")
+        .order("id", { ascending: false });
+
+    if (resultError) throw resultError;
+
+    exerciseResultsHistory = results || [];
+
+    console.log("Supabase terhubung.");
+  } catch (error) {
+    console.error("Gagal mengambil data Supabase:", error);
+    alert("Database belum dapat dihubungkan. Periksa koneksi Supabase.");
+  }
+}
 
 /* ==========================================================================
    NAVIGASI DAN ALUR PANEL
@@ -209,7 +253,7 @@ function normalizeForComparison(text) {
     .trim();
 }
 
-function checkTypingAnswer() {
+async function checkTypingAnswer() {
   const userRawInput = document.getElementById("typing-input").value;
   const userCleanInput = normalizeText(userRawInput);
 
@@ -259,7 +303,7 @@ function checkTypingAnswer() {
     activeSession.retryAssessment = assessmentResult;
   }
 
-  saveSessionRecord();
+  await saveSessionRecord();;
   renderResultsView();
   navigateTo("view-hasil");
 }
@@ -313,33 +357,42 @@ function renderFeedbackList(containerId, details) {
   });
 }
 
-function saveSessionRecord() {
-  const recordIndex = exerciseResultsHistory.findIndex(r => 
-    r.id === activeSession.student.id + "_" + activeSession.date + "_" + activeSession.material.code
-  );
-
+fasync function saveSessionRecord() {
   const recordData = {
-    id: activeSession.student.id + "_" + activeSession.date + "_" + activeSession.material.code,
-    studentId: activeSession.student.id,
-    studentName: activeSession.student.name,
-    date: activeSession.date,
-    class: "SMPLB - SMALB",
-    profile: activeSession.packageCode,
-    materialCode: activeSession.material.code,
-    totalSentences: activeSession.primaryAssessment.totalSentences,
-    primaryResult: `${activeSession.primaryAssessment.correctCount}/${activeSession.primaryAssessment.totalSentences}`,
-    retryResult: activeSession.retryAssessment ? `${activeSession.retryAssessment.correctCount}/${activeSession.retryAssessment.totalSentences}` : "-",
-    details: activeSession.primaryAssessment.details,
-    retryDetails: activeSession.retryAssessment ? activeSession.retryAssessment.details : null
+    student_id: activeSession.student.id,
+    student_name: activeSession.student.name,
+    date: new Date().toISOString().split("T")[0],
+    package: activeSession.material.code,
+    main_result: {
+      totalSentences: activeSession.primaryAssessment.totalSentences,
+      correctCount: activeSession.primaryAssessment.correctCount,
+      needsImprovementCount:
+        activeSession.primaryAssessment.needsImprovementCount,
+      details: activeSession.primaryAssessment.details
+    },
+    retry_result: activeSession.retryAssessment
+      ? {
+          totalSentences: activeSession.retryAssessment.totalSentences,
+          correctCount: activeSession.retryAssessment.correctCount,
+          needsImprovementCount:
+            activeSession.retryAssessment.needsImprovementCount,
+          details: activeSession.retryAssessment.details
+        }
+      : null
   };
 
-  if (recordIndex >= 0) {
-    exerciseResultsHistory[recordIndex] = recordData;
-  } else {
-    exerciseResultsHistory.push(recordData);
+  const { error } = await supabaseClient
+    .from("results")
+    .insert(recordData);
+
+  if (error) {
+    console.error("Gagal menyimpan hasil:", error);
+    alert("Hasil belum berhasil disimpan ke database.");
+    return false;
   }
 
-  saveResultsToLocalStorage();
+  console.log("Hasil berhasil disimpan ke Supabase.");
+  return true;
 }
 
 function startRetrySession() {

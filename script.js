@@ -392,21 +392,49 @@ async function checkTypingResult() {
   history.push(recordPayload);
   saveHistoryLocal(history);
 
-  if (supabaseClient) {
-    try {
+  // ===== SIMPAN HASIL KE SUPABASE (STRUKTUR RESULTS BARU) =====
+if (supabaseClient) {
+  try {
+    const resultData = {
+      score: `${correctCount}/${targets.length}`,
+      correct: correctCount,
+      total: targets.length,
+      details: sentenceEvaluations,
+      completed_at: new Date().toISOString()
+    };
+
+    if (!currentSession.isRetry) {
+      // Latihan utama
+      currentSession.mainResultRecord = resultData;
+
       await supabaseClient.from("results").insert([{
         student_id: currentSession.studentId,
         student_name: currentSession.studentName,
         date: new Date().toISOString().split("T")[0],
-        session_type: recordPayload.sessionType,
-        correct_count: correctCount,
-        total_count: targets.length,
-        details_json: sentenceEvaluations
+        package: currentSession.profile,
+        main_result: resultData,
+        retry_result: null
       }]);
-    } catch (dbErr) {
-      console.warn("Gagal menyimpan ke Supabase (Tersimpan di LocalStorage):", dbErr);
+
+    } else {
+      // Latihan perbaikan
+      await supabaseClient.from("results").insert([{
+        student_id: currentSession.studentId,
+        student_name: currentSession.studentName,
+        date: new Date().toISOString().split("T")[0],
+        package: currentSession.profile,
+        main_result: currentSession.mainResultRecord,
+        retry_result: resultData
+      }]);
     }
+
+  } catch (dbErr) {
+    console.warn(
+      "Gagal menyimpan ke Supabase (Tersimpan di LocalStorage):",
+      dbErr
+    );
   }
+}
 
   renderResultScreen(correctCount, wrongCount, sentenceEvaluations);
   switchScreen("screen-hasil-latihan");

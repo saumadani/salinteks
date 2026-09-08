@@ -2,19 +2,13 @@
    LATIHAN TIK — AYO MENYALIN TEKS (SLB INSAN MADANI METRO)
    ========================================================================== */
 
-// PIN GURU LOKAL
-const TEACHER_PIN = "242456";
-
-// =====================================================
-// SUPABASE DATABASE
-// =====================================================
+// SUPABASE CONFIGURATION
 const SUPABASE_URL = "https://wdvvpgzenpkqchgeatnd.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_SkveRAK4SAbZJltckam3Qw_G_9x5vzF";
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
-const supabaseClient = window.supabase.createClient(
-  SUPABASE_URL,
-  SUPABASE_PUBLISHABLE_KEY
-);
+// PIN GURU LOKAL
+const TEACHER_PIN = "242456";
 
 // 1. DATA MATERI LATIHAN TERKUNCI (PACKAGE A, B, C)
 const MATERIAL_PACKAGES = {
@@ -52,14 +46,16 @@ let activeSession = {
 };
 
 // 3. INITIALIZATION
-document.addEventListener("DOMContentLoaded", async () => {
-  await loadDataFromSupabase();
-  populateAbsensiDropdown();
-  renderTeacherTables();
+document.addEventListener("DOMContentLoaded", () => {
+  loadDataFromSupabase();
 });
 
+/* ==========================================================================
+   SUPABASE DATA LOADING & MAPPING
+   ========================================================================== */
 async function loadDataFromSupabase() {
   try {
+    // Ambil data siswa dari Supabase
     const { data: students, error: studentError } =
       await supabaseClient
         .from("students")
@@ -74,6 +70,7 @@ async function loadDataFromSupabase() {
       profile: student.profile || "A"
     }));
 
+    // Ambil histori hasil belajar dari Supabase
     const { data: results, error: resultError } =
       await supabaseClient
         .from("results")
@@ -82,9 +79,50 @@ async function loadDataFromSupabase() {
 
     if (resultError) throw resultError;
 
-    exerciseResultsHistory = results || [];
+    // Konversi format Supabase menjadi format yang digunakan Menu Guru.
+    exerciseResultsHistory = (results || []).map(r => {
+      const main = r.main_result || {};
+      const retry = r.retry_result || null;
+
+      return {
+        id: String(r.id),
+        studentId: String(r.student_id),
+        studentName: r.student_name || "-",
+        date: r.date || "-",
+        class: "SMPLB - SMALB",
+
+        profile: r.package
+          ? String(r.package).charAt(0)
+          : "A",
+
+        materialCode: r.package || "-",
+
+        totalSentences: Number(main.totalSentences || 0),
+
+        primaryResult:
+          `${Number(main.correctCount || 0)}/${Number(main.totalSentences || 0)}`,
+
+        retryResult: retry
+          ? `${Number(retry.correctCount || 0)}/${Number(retry.totalSentences || 0)}`
+          : "-",
+
+        details: Array.isArray(main.details)
+          ? main.details
+          : [],
+
+        retryDetails: retry && Array.isArray(retry.details)
+          ? retry.details
+          : null
+      };
+    });
 
     console.log("Supabase terhubung.");
+    console.log("Jumlah siswa:", studentsList.length);
+    console.log("Jumlah histori:", exerciseResultsHistory.length);
+
+    populateAbsensiDropdown();
+    renderTeacherTables();
+
   } catch (error) {
     console.error("Gagal mengambil data Supabase:", error);
     alert("Database belum dapat dihubungkan. Periksa koneksi Supabase.");
@@ -104,7 +142,6 @@ function navigateTo(panelId) {
     targetPanel.classList.add("active");
   }
 
-  // Khusus Ayo Mengetik & Hasil Latihan: aktifkan layout desktop terpusat
   const appViewport = document.getElementById("app-viewport");
   if (panelId === "view-ketik" || panelId === "view-hasil") {
     appViewport.classList.add("desktop-wide-view");
@@ -116,34 +153,6 @@ function navigateTo(panelId) {
 }
 
 /* ==========================================================================
-   LOCALSTORAGE & PERMANENT DATA
-   ========================================================================== */
-function loadDataFromLocalStorage() {
-  try {
-    const savedStudents = localStorage.getItem("tik_students_data");
-    studentsList = savedStudents ? JSON.parse(savedStudents) : [];
-
-    const savedResults = localStorage.getItem("tik_results_history");
-    exerciseResultsHistory = savedResults ? JSON.parse(savedResults) : [];
-  } catch (e) {
-    console.error("Gagal membaca localStorage:", e);
-    studentsList = [];
-    exerciseResultsHistory = [];
-  }
-}
-
-function saveStudentsToLocalStorage() {
-  localStorage.setItem("tik_students_data", JSON.stringify(studentsList));
-  populateAbsensiDropdown();
-  renderTeacherTables();
-}
-
-function saveResultsToLocalStorage() {
-  localStorage.setItem("tik_results_history", JSON.stringify(exerciseResultsHistory));
-  renderTeacherTables();
-}
-
-/* ==========================================================================
    ABSENSI SISWA
    ========================================================================== */
 function populateAbsensiDropdown() {
@@ -152,17 +161,19 @@ function populateAbsensiDropdown() {
   const btnStartEl = document.getElementById("btn-start-session");
   const detailsEl = document.getElementById("absensi-details");
 
+  if (!selectEl) return;
+
   selectEl.innerHTML = '<option value="">-- Pilih Nama --</option>';
 
   if (!studentsList || studentsList.length === 0) {
-    emptyMsgEl.classList.remove("hidden");
+    if (emptyMsgEl) emptyMsgEl.classList.remove("hidden");
     selectEl.disabled = true;
-    btnStartEl.disabled = true;
-    detailsEl.classList.add("hidden");
+    if (btnStartEl) btnStartEl.disabled = true;
+    if (detailsEl) detailsEl.classList.add("hidden");
     return;
   }
 
-  emptyMsgEl.classList.add("hidden");
+  if (emptyMsgEl) emptyMsgEl.classList.add("hidden");
   selectEl.disabled = false;
 
   studentsList.forEach(st => {
@@ -173,8 +184,8 @@ function populateAbsensiDropdown() {
   });
 
   selectEl.value = "";
-  btnStartEl.disabled = true;
-  detailsEl.classList.add("hidden");
+  if (btnStartEl) btnStartEl.disabled = true;
+  if (detailsEl) detailsEl.classList.add("hidden");
 }
 
 function handleStudentSelect() {
@@ -186,22 +197,20 @@ function handleStudentSelect() {
   if (selectEl.value) {
     const student = studentsList.find(s => s.id === selectEl.value);
     if (student) {
-      const todayDate = new Date().toLocaleDateString('id-ID', {
-        day: 'numeric', month: 'long', year: 'numeric'
-      });
+      const todayDate = new Date().toISOString().split('T')[0];
 
-      dateEl.textContent = todayDate;
+      if (dateEl) dateEl.textContent = todayDate;
       activeSession.student = student;
       activeSession.date = todayDate;
 
-      detailsEl.classList.remove("hidden");
-      btnStartEl.disabled = false;
+      if (detailsEl) detailsEl.classList.remove("hidden");
+      if (btnStartEl) btnStartEl.disabled = false;
       return;
     }
   }
 
-  detailsEl.classList.add("hidden");
-  btnStartEl.disabled = true;
+  if (detailsEl) detailsEl.classList.add("hidden");
+  if (btnStartEl) btnStartEl.disabled = true;
 }
 
 function startExerciseSession() {
@@ -210,7 +219,8 @@ function startExerciseSession() {
   activeSession.isRetryMode = false;
   activeSession.primaryAssessment = null;
   activeSession.retryAssessment = null;
-  document.getElementById("typing-input").value = "";
+  const typingInput = document.getElementById("typing-input");
+  if (typingInput) typingInput.value = "";
 
   const profile = activeSession.student.profile || "A";
   activeSession.packageCode = profile;
@@ -219,8 +229,11 @@ function startExerciseSession() {
   const randomIndex = Math.floor(Math.random() * pack.length);
   activeSession.material = pack[randomIndex];
 
-  document.getElementById("display-reading-text").textContent = activeSession.material.text;
-  document.getElementById("reference-text").textContent = activeSession.material.text;
+  const displayReadingText = document.getElementById("display-reading-text");
+  const referenceText = document.getElementById("reference-text");
+
+  if (displayReadingText) displayReadingText.textContent = activeSession.material.text;
+  if (referenceText) referenceText.textContent = activeSession.material.text;
 
   navigateTo("view-baca");
 }
@@ -228,7 +241,6 @@ function startExerciseSession() {
 /* ==========================================================================
    EVALUASI TEKS & NORMALISASI MENGETIK
    ========================================================================== */
-
 function getSentencesArray(text) {
   if (!text) return [];
   return text
@@ -253,7 +265,7 @@ function normalizeForComparison(text) {
     .trim();
 }
 
-async function checkTypingAnswer() {
+function checkTypingAnswer() {
   const userRawInput = document.getElementById("typing-input").value;
   const userCleanInput = normalizeText(userRawInput);
 
@@ -303,7 +315,7 @@ async function checkTypingAnswer() {
     activeSession.retryAssessment = assessmentResult;
   }
 
-  await saveSessionRecord();;
+  saveSessionRecord();
   renderResultsView();
   navigateTo("view-hasil");
 }
@@ -320,24 +332,27 @@ function renderResultsView() {
 
   const retrySectionEl = document.getElementById("retry-result-section");
   if (activeSession.retryAssessment) {
-    retrySectionEl.classList.remove("hidden");
+    if (retrySectionEl) retrySectionEl.classList.remove("hidden");
     renderFeedbackList("retry-feedback-list", activeSession.retryAssessment.details);
   } else {
-    retrySectionEl.classList.add("hidden");
+    if (retrySectionEl) retrySectionEl.classList.add("hidden");
   }
 
   const currentAss = activeSession.retryAssessment || activeSession.primaryAssessment;
   const motivationEl = document.getElementById("res-motivation-text");
 
-  if (currentAss.correctCount === currentAss.totalSentences) {
-    motivationEl.textContent = "🎉 Bagus sekali! Kamu sudah menyalin seluruh teks dengan sangat teliti dan rapi. Pertahankan ya!";
-  } else {
-    motivationEl.textContent = "😊 Bagus! Kamu sudah berusaha dengan baik. Coba perhatikan kembali bagian yang perlu diperbaiki agar semakin rapi.";
+  if (motivationEl) {
+    if (currentAss.correctCount === currentAss.totalSentences) {
+      motivationEl.textContent = "🎉 Bagus sekali! Kamu sudah menyalin seluruh teks dengan sangat teliti dan rapi. Pertahankan ya!";
+    } else {
+      motivationEl.textContent = "😊 Bagus! Kamu sudah berusaha dengan baik. Coba perhatikan kembali bagian yang perlu diperbaiki agar semakin rapi.";
+    }
   }
 }
 
 function renderFeedbackList(containerId, details) {
   const container = document.getElementById(containerId);
+  if (!container) return;
   container.innerHTML = "";
 
   details.forEach(item => {
@@ -358,46 +373,34 @@ function renderFeedbackList(containerId, details) {
 }
 
 async function saveSessionRecord() {
-  const recordData = {
+  const payload = {
     student_id: activeSession.student.id,
     student_name: activeSession.student.name,
-    date: new Date().toISOString().split("T")[0],
+    date: activeSession.date,
     package: activeSession.material.code,
-    main_result: {
-      totalSentences: activeSession.primaryAssessment.totalSentences,
-      correctCount: activeSession.primaryAssessment.correctCount,
-      needsImprovementCount:
-        activeSession.primaryAssessment.needsImprovementCount,
-      details: activeSession.primaryAssessment.details
-    },
+    main_result: activeSession.primaryAssessment,
     retry_result: activeSession.retryAssessment
-      ? {
-          totalSentences: activeSession.retryAssessment.totalSentences,
-          correctCount: activeSession.retryAssessment.correctCount,
-          needsImprovementCount:
-            activeSession.retryAssessment.needsImprovementCount,
-          details: activeSession.retryAssessment.details
-        }
-      : null
   };
 
-  const { error } = await supabaseClient
-    .from("results")
-    .insert(recordData);
+  try {
+    const { data, error } = await supabaseClient
+      .from("results")
+      .insert([payload]);
 
-  if (error) {
-    console.error("Gagal menyimpan hasil:", error);
-    alert("Hasil belum berhasil disimpan ke database.");
-    return false;
+    if (error) throw error;
+    console.log("Berhasil menyimpan hasil ke Supabase:", data);
+    
+    // Refresh data dari database
+    await loadDataFromSupabase();
+  } catch (err) {
+    console.error("Gagal menyimpan hasil ke Supabase:", err);
   }
-
-  console.log("Hasil berhasil disimpan ke Supabase.");
-  return true;
 }
 
 function startRetrySession() {
   activeSession.isRetryMode = true;
-  document.getElementById("typing-input").value = "";
+  const typingInput = document.getElementById("typing-input");
+  if (typingInput) typingInput.value = "";
   navigateTo("view-ketik");
 }
 
@@ -417,39 +420,45 @@ function finishSessionAndReset() {
 }
 
 /* ==========================================================================
-   KEAMANAN PIN & MENU GURU (HANDLED VIA FORM SUBMIT)
+   KEAMANAN PIN & MENU GURU
    ========================================================================== */
 function promptTeacherPin() {
   const pinInput = document.getElementById("pin-input");
-  pinInput.value = "";
-  document.getElementById("pin-error-msg").classList.add("hidden");
-  document.getElementById("modal-pin").classList.remove("hidden");
+  if (pinInput) pinInput.value = "";
+  const errEl = document.getElementById("pin-error-msg");
+  if (errEl) errEl.classList.add("hidden");
+  
+  const modalPin = document.getElementById("modal-pin");
+  if (modalPin) modalPin.classList.remove("hidden");
   
   setTimeout(() => {
-    pinInput.focus();
+    if (pinInput) pinInput.focus();
   }, 100);
 }
 
 function handlePinSubmit(event) {
-  event.preventDefault(); // Mencegah reload halaman standar HTML form
+  if (event) event.preventDefault();
   
-  const inputPin = document.getElementById("pin-input").value.trim();
+  const pinInput = document.getElementById("pin-input");
+  const inputPin = pinInput ? pinInput.value.trim() : "";
   
   if (inputPin === TEACHER_PIN) {
-    document.getElementById("modal-pin").classList.add("hidden");
+    const modalPin = document.getElementById("modal-pin");
+    if (modalPin) modalPin.classList.add("hidden");
     navigateTo("view-guru");
   } else {
     const errorMsg = document.getElementById("pin-error-msg");
-    const pinInput = document.getElementById("pin-input");
-    
-    errorMsg.classList.remove("hidden");
-    pinInput.value = "";
-    pinInput.focus(); // Input tetap aktif agar guru dapat langsung mengetik ulang
+    if (errorMsg) errorMsg.classList.remove("hidden");
+    if (pinInput) {
+      pinInput.value = "";
+      pinInput.focus();
+    }
   }
 }
 
 function closePinModal() {
-  document.getElementById("modal-pin").classList.add("hidden");
+  const modalPin = document.getElementById("modal-pin");
+  if (modalPin) modalPin.classList.add("hidden");
 }
 
 function switchTeacherTab(tabName) {
@@ -457,61 +466,69 @@ function switchTeacherTab(tabName) {
   document.querySelectorAll(".tab-content").forEach(content => content.classList.remove("active"));
 
   if (tabName === 'students') {
-    document.getElementById("tab-btn-students").classList.add("active");
-    document.getElementById("teacher-tab-students").classList.add("active");
+    const btnSt = document.getElementById("tab-btn-students");
+    const tabSt = document.getElementById("teacher-tab-students");
+    if (btnSt) btnSt.classList.add("active");
+    if (tabSt) tabSt.classList.add("active");
   } else {
-    document.getElementById("tab-btn-results").classList.add("active");
-    document.getElementById("teacher-tab-results").classList.add("active");
+    const btnRes = document.getElementById("tab-btn-results");
+    const tabRes = document.getElementById("teacher-tab-results");
+    if (btnRes) btnRes.classList.add("active");
+    if (tabRes) tabRes.classList.add("active");
   }
 }
 
 function renderTeacherTables() {
   // 1. DATA SISWA
   const studentBody = document.getElementById("student-table-body");
-  studentBody.innerHTML = "";
+  if (studentBody) {
+    studentBody.innerHTML = "";
 
-  if (!studentsList || studentsList.length === 0) {
-    studentBody.innerHTML = `<tr><td colspan="3" class="text-center" style="color:var(--text-muted)">Belum ada data siswa.</td></tr>`;
-  } else {
-    studentsList.forEach(s => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td><strong>${s.name}</strong></td>
-        <td>Profil ${s.profile}</td>
-        <td>
-          <button class="btn btn-secondary btn-sm" onclick="editStudent('${s.id}')">✏️ Edit</button>
-          <button class="btn btn-secondary btn-sm" style="color:var(--danger-red)" onclick="deleteStudent('${s.id}')">🗑️ Hapus</button>
-        </td>
-      `;
-      studentBody.appendChild(tr);
-    });
+    if (!studentsList || studentsList.length === 0) {
+      studentBody.innerHTML = `<tr><td colspan="3" class="text-center" style="color:var(--text-muted)">Belum ada data siswa.</td></tr>`;
+    } else {
+      studentsList.forEach(s => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td><strong>${s.name}</strong></td>
+          <td>Profil ${s.profile}</td>
+          <td>
+            <button class="btn btn-secondary btn-sm" onclick="editStudent('${s.id}')">✏️ Edit</button>
+            <button class="btn btn-secondary btn-sm" style="color:var(--danger-red)" onclick="deleteStudent('${s.id}')">🗑️ Hapus</button>
+          </td>
+        `;
+        studentBody.appendChild(tr);
+      });
+    }
   }
 
   // 2. HISTORI HASIL BELAJAR
   const resultsBody = document.getElementById("results-table-body");
-  resultsBody.innerHTML = "";
+  if (resultsBody) {
+    resultsBody.innerHTML = "";
 
-  if (!exerciseResultsHistory || exerciseResultsHistory.length === 0) {
-    resultsBody.innerHTML = `<tr><td colspan="6" class="text-center" style="color:var(--text-muted)">Belum ada histori hasil belajar.</td></tr>`;
-  } else {
-    exerciseResultsHistory.forEach((r, idx) => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${r.date}</td>
-        <td><strong>${r.studentName}</strong></td>
-        <td>${r.totalSentences} Kalimat</td>
-        <td><span style="color:var(--success-green); font-weight:bold">${r.primaryResult}</span> Benar</td>
-        <td>${r.retryResult !== '-' ? `<span style="color:var(--primary-purple); font-weight:bold">${r.retryResult}</span> Benar` : '-'}</td>
-        <td>
-          <div class="action-btn-group">
-            <button class="btn btn-secondary btn-sm" onclick="viewHistoryDetail(${idx})">👁️</button>
-            <button class="btn btn-secondary btn-sm" onclick="openHistoryEdit(${idx})">✏️</button>
-            <button class="btn btn-secondary btn-sm" style="color:var(--danger-red)" onclick="deleteHistoryRecord(${idx})">🗑️</button>
-          </div>
-        </td>
-      `;
-      resultsBody.appendChild(tr);
-    });
+    if (!exerciseResultsHistory || exerciseResultsHistory.length === 0) {
+      resultsBody.innerHTML = `<tr><td colspan="6" class="text-center" style="color:var(--text-muted)">Belum ada histori hasil belajar.</td></tr>`;
+    } else {
+      exerciseResultsHistory.forEach((r, idx) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${r.date}</td>
+          <td><strong>${r.studentName}</strong></td>
+          <td>${r.totalSentences} Kalimat</td>
+          <td><span style="color:var(--success-green); font-weight:bold">${r.primaryResult}</span> Benar</td>
+          <td>${r.retryResult !== '-' ? `<span style="color:var(--primary-purple); font-weight:bold">${r.retryResult}</span> Benar` : '-'}</td>
+          <td>
+            <div class="action-btn-group">
+              <button class="btn btn-secondary btn-sm" onclick="viewHistoryDetail(${idx})">👁️</button>
+              <button class="btn btn-secondary btn-sm" onclick="openHistoryEdit(${idx})">✏️</button>
+              <button class="btn btn-secondary btn-sm" style="color:var(--danger-red)" onclick="deleteHistoryRecord(${idx})">🗑️</button>
+            </div>
+          </td>
+        `;
+        resultsBody.appendChild(tr);
+      });
+    }
   }
 }
 
@@ -529,7 +546,7 @@ function closeStudentForm() {
   document.getElementById("student-form-box").classList.add("hidden");
 }
 
-function saveStudentData() {
+async function saveStudentData() {
   const id = document.getElementById("edit-student-id").value;
   const name = document.getElementById("input-student-name").value.trim();
   const profile = document.getElementById("input-student-profile").value;
@@ -539,23 +556,26 @@ function saveStudentData() {
     return;
   }
 
-  if (id) {
-    const student = studentsList.find(s => s.id === id);
-    if (student) {
-      student.name = name;
-      student.profile = profile;
+  try {
+    if (id) {
+      const { error } = await supabaseClient
+        .from("students")
+        .update({ name, profile })
+        .eq("id", id);
+      if (error) throw error;
+    } else {
+      const { error } = await supabaseClient
+        .from("students")
+        .insert([{ name, profile }]);
+      if (error) throw error;
     }
-  } else {
-    const newStudent = {
-      id: "st_" + Date.now(),
-      name: name,
-      profile: profile
-    };
-    studentsList.push(newStudent);
-  }
 
-  saveStudentsToLocalStorage();
-  closeStudentForm();
+    await loadDataFromSupabase();
+    closeStudentForm();
+  } catch (err) {
+    console.error("Gagal menyimpan data siswa ke Supabase:", err);
+    alert("Gagal menyimpan data siswa.");
+  }
 }
 
 function editStudent(id) {
@@ -569,13 +589,23 @@ function editStudent(id) {
   document.getElementById("student-form-box").classList.remove("hidden");
 }
 
-function deleteStudent(id) {
+async function deleteStudent(id) {
   const student = studentsList.find(s => s.id === id);
   if (!student) return;
 
   if (confirm(`Apakah Anda yakin ingin menghapus siswa "${student.name}"?\n(Riwayat hasil belajar siswa ini akan tetap ada).`)) {
-    studentsList = studentsList.filter(s => s.id !== id);
-    saveStudentsToLocalStorage();
+    try {
+      const { error } = await supabaseClient
+        .from("students")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+      await loadDataFromSupabase();
+    } catch (err) {
+      console.error("Gagal menghapus siswa:", err);
+      alert("Gagal menghapus data siswa.");
+    }
   }
 }
 
@@ -592,28 +622,32 @@ function viewHistoryDetail(index) {
     });
   }
 
-  contentEl.innerHTML = `
-    <p><strong>Nama:</strong> ${record.studentName}</p>
-    <p><strong>Tanggal:</strong> ${record.date}</p>
-    <p><strong>Penilaian Utama:</strong> ${record.primaryResult}</p>
-    <p><strong>Latihan Perbaikan:</strong> ${record.retryResult}</p>
-    <hr style="margin:12px 0; border:0; border-top:1px solid #DFE6E9;">
-    <h4 style="color:var(--primary-purple); margin-bottom:8px;">Rincian Kalimat:</h4>
-    ${primaryDetailsHtml}
-  `;
+  if (contentEl) {
+    contentEl.innerHTML = `
+      <p><strong>Nama:</strong> ${record.studentName}</p>
+      <p><strong>Tanggal:</strong> ${record.date}</p>
+      <p><strong>Penilaian Utama:</strong> ${record.primaryResult}</p>
+      <p><strong>Latihan Perbaikan:</strong> ${record.retryResult}</p>
+      <hr style="margin:12px 0; border:0; border-top:1px solid #DFE6E9;">
+      <h4 style="color:var(--primary-purple); margin-bottom:8px;">Rincian Kalimat:</h4>
+      ${primaryDetailsHtml}
+    `;
+  }
 
-  document.getElementById("modal-detail").classList.remove("hidden");
+  const modalDetail = document.getElementById("modal-detail");
+  if (modalDetail) modalDetail.classList.remove("hidden");
 }
 
 function closeDetailModal() {
-  document.getElementById("modal-detail").classList.add("hidden");
+  const modalDetail = document.getElementById("modal-detail");
+  if (modalDetail) modalDetail.classList.add("hidden");
 }
 
 function openHistoryEdit(index) {
   const record = exerciseResultsHistory[index];
   if (!record) return;
 
-  document.getElementById("edit-history-id").value = index;
+  document.getElementById("edit-history-id").value = record.id;
   document.getElementById("edit-history-student").value = record.studentName;
   document.getElementById("edit-history-primary").value = record.primaryResult;
   document.getElementById("edit-history-retry").value = record.retryResult;
@@ -625,22 +659,76 @@ function closeHistoryEdit() {
   document.getElementById("history-edit-box").classList.add("hidden");
 }
 
-function saveHistoryEdit() {
-  const index = document.getElementById("edit-history-id").value;
-  const newPrimary = document.getElementById("edit-history-primary").value.trim();
-  const newRetry = document.getElementById("edit-history-retry").value.trim();
+async function saveHistoryEdit() {
+  const recordId = document.getElementById("edit-history-id").value;
+  const newPrimaryStr = document.getElementById("edit-history-primary").value.trim();
+  const newRetryStr = document.getElementById("edit-history-retry").value.trim();
 
-  if (exerciseResultsHistory[index]) {
-    exerciseResultsHistory[index].primaryResult = newPrimary || exerciseResultsHistory[index].primaryResult;
-    exerciseResultsHistory[index].retryResult = newRetry || "-";
-    saveResultsToLocalStorage();
+  const record = exerciseResultsHistory.find(r => r.id === recordId);
+  if (!record) return;
+
+  // Parse hasil perbaikan / penilaian utama sederhana
+  const parseResult = (str, fallbackTotal) => {
+    const parts = str.split('/');
+    if (parts.length === 2) {
+      return { correctCount: parseInt(parts[0]) || 0, totalSentences: parseInt(parts[1]) || fallbackTotal };
+    }
+    return null;
+  };
+
+  const updatedMain = parseResult(newPrimaryStr, record.totalSentences);
+  const updatedRetry = newRetryStr !== '-' ? parseResult(newRetryStr, record.totalSentences) : null;
+
+  try {
+    const updatePayload = {};
+    if (updatedMain) {
+      updatePayload.main_result = {
+        totalSentences: updatedMain.totalSentences,
+        correctCount: updatedMain.correctCount,
+        needsImprovementCount: updatedMain.totalSentences - updatedMain.correctCount,
+        details: record.details
+      };
+    }
+    if (updatedRetry !== undefined) {
+      updatePayload.retry_result = updatedRetry ? {
+        totalSentences: updatedRetry.totalSentences,
+        correctCount: updatedRetry.correctCount,
+        needsImprovementCount: updatedRetry.totalSentences - updatedRetry.correctCount,
+        details: record.retryDetails || []
+      } : null;
+    }
+
+    const { error } = await supabaseClient
+      .from("results")
+      .update(updatePayload)
+      .eq("id", recordId);
+
+    if (error) throw error;
+
+    await loadDataFromSupabase();
     closeHistoryEdit();
+  } catch (err) {
+    console.error("Gagal mengedit histori:", err);
+    alert("Gagal menyimpan perubahan histori.");
   }
 }
 
-function deleteHistoryRecord(index) {
+async function deleteHistoryRecord(index) {
+  const record = exerciseResultsHistory[index];
+  if (!record) return;
+
   if (confirm("Apakah Anda yakin ingin menghapus histori hasil belajar ini?")) {
-    exerciseResultsHistory.splice(index, 1);
-    saveResultsToLocalStorage();
+    try {
+      const { error } = await supabaseClient
+        .from("results")
+        .delete()
+        .eq("id", record.id);
+
+      if (error) throw error;
+      await loadDataFromSupabase();
+    } catch (err) {
+      console.error("Gagal menghapus histori:", err);
+      alert("Gagal menghapus histori hasil belajar.");
+    }
   }
 }

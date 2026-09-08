@@ -1,453 +1,510 @@
 /* ==========================================================================
-   LATIHAN TIK — AYO MENYALIN TEKS (SLB INSAN MADANI METRO)
+   SALINTEKS V1.3 LOCAL - SCRIPT LOGIC TERINTEGRASI DATABASE SUPABASE
    ========================================================================== */
 
-// SUPABASE CONFIGURATION
-const SUPABASE_URL = "https://wdvvpgzenpkqchgeatnd.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_SkveRAK4SAbZJltckam3Qw_G_9x5vzF";
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
-
-// PIN GURU LOKAL
+// 1. KONSTANTA & STORAGE KEYS
+const STORAGE_KEY_STUDENTS = "tik_students_data";
+const STORAGE_KEY_HISTORY = "tik_results_history";
 const TEACHER_PIN = "242456";
 
-// 1. DATA MATERI LATIHAN TERKUNCI (PACKAGE A, B, C)
+// 2. SUPABASE CONFIGURATION (MENGGUNAKAN PUBLISHABLE ANON KEY)
+const SUPABASE_URL = "https://wdvvpgzenpkqchgeatnd.supabase.co"; // URL Supabase Anda
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_SkveRAK4SAbZJltckam3Qw_G_9x5vzF"; // Public Anon Key Anda
+
+let supabaseClient = null;
+if (window.supabase) {
+  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+}
+
+// 3. STRUKTUR MATERIAL TEKS PAKET A, B, DAN C
 const MATERIAL_PACKAGES = {
+  // PAKET A — TINGKAT MUDAH (1 Teks, Target Huruf Kapital A-Z)
   A: [
-    { code: "A1", text: "Abu vulkanik dapat mengganggu pernapasan. Gunakan masker saat berada di luar rumah." },
-    { code: "A2", text: "Abu vulkanik dapat mengenai mata. Gunakan pelindung mata saat berada di luar rumah." },
-    { code: "A3", text: "Kita perlu menjaga kesehatan saat ada abu vulkanik. Gunakan masker untuk melindungi pernapasan." },
-    { code: "A4", text: "Abu vulkanik dapat menyebar ke beberapa wilayah. Kurangi kegiatan di luar rumah jika abu meningkat." },
-    { code: "A5", text: "Abu vulkanik dapat mengotori air dan makanan. Tutup air dan makanan agar tetap bersih." }
+    {
+      id: "A1",
+      sentences: ["ABCDEFGHIJKLMNOPQRSTUVWXYZ"]
+    }
   ],
+
+  // PAKET B — TINGKAT SEDANG (Minimal 2 Teks Latihan, Masing-masing 2-3 Kalimat)
   B: [
-    { code: "B1", text: "Abu vulkanik dapat mengganggu pernapasan. Gunakan masker saat berada di luar rumah. Gunakan pelindung mata jika abu banyak." },
-    { code: "B2", text: "Abu vulkanik dapat mengenai mata dan kulit. Gunakan pelindung saat berada di luar rumah. Kurangi kegiatan di luar rumah jika abu meningkat." },
-    { code: "B3", text: "Abu vulkanik dapat menyebar ke beberapa wilayah. Gunakan masker untuk melindungi pernapasan. Tutup air dan makanan agar tidak terkena abu." },
-    { code: "B4", text: "Erupsi Gunung Anak Krakatau masih dipantau. Abu vulkanik dapat terbawa angin. Masyarakat perlu mengikuti informasi resmi." }
+    {
+      id: "B1",
+      sentences: [
+        "abu vulkanik dapat mengganggu pernapasan.",
+        "gunakan masker saat berada di luar rumah.",
+        "gunakan pelindung mata jika abu banyak."
+      ]
+    },
+    {
+      id: "B2",
+      sentences: [
+        "erupsi gunung anak krakatau masih dipantau.",
+        "abu vulkanik dapat terbawa angin.",
+        "masyarakat perlu mengikuti informasi resmi."
+      ]
+    }
   ],
+
+  // PAKET C — TINGKAT LEBIH SULIT (Minimal 2 Teks Latihan, Masing-masing 3 Kalimat)
   C: [
-    { code: "C1", text: "Gunung Anak Krakatau sedang mengalami erupsi. Erupsi menghasilkan abu vulkanik yang dapat menyebar. Abu vulkanik dapat mengganggu pernapasan. Gunakan masker saat berada di luar rumah. Gunakan pelindung mata ketika abu meningkat. Kurangi kegiatan di luar rumah dan ikuti informasi resmi." },
-    { code: "C2", text: "Abu vulkanik Gunung Anak Krakatau terpantau di beberapa wilayah. Sebaran abu dapat berubah mengikuti arah angin. Abu dapat mengenai mata dan saluran pernapasan. Gunakan masker dan pelindung mata saat berada di luar. Tutup makanan dan sumber air agar tidak terkena abu. Tetap tenang dan ikuti informasi dari pihak berwenang." }
+    {
+      id: "C1",
+      sentences: [
+        "gunung anak krakatau sedang mengalami erupsi.",
+        "abu vulkanik dapat mengganggu pernapasan.",
+        "gunakan masker saat berada di luar rumah."
+      ]
+    },
+    {
+      id: "C2",
+      sentences: [
+        "abu vulkanik terpantau di beberapa wilayah.",
+        "sebaran abu dapat berubah mengikuti arah angin.",
+        "gunakan masker dan pelindung mata saat di luar."
+      ]
+    }
   ]
 };
 
-// 2. STATE SISTEM & SESI AKTIF
-let studentsList = [];
-let exerciseResultsHistory = [];
+// 4. INITIAL DEFAULT DATA SISWA
+const DEFAULT_STUDENTS = [
+  { id: "std_1", name: "Rizky Tabah", profile: "A" },
+  { id: "std_2", name: "Siti Rahma", profile: "B" },
+  { id: "std_3", name: "Ahmad Dani", profile: "C" }
+];
 
-let activeSession = {
-  student: null,
+// 5. STATE APLIKASI ACTIVE
+let currentSession = {
+  studentId: null,
+  studentName: "",
+  profile: "A",
   date: "",
-  packageCode: "A",
-  material: null,
-  primaryAssessment: null,
-  retryAssessment: null,
-  isRetryMode: false
+  targetSentences: [],
+  isRetry: false,
+  mainResultRecord: null
 };
 
-// 3. INITIALIZATION
-document.addEventListener("DOMContentLoaded", () => {
-  loadDataFromSupabase();
+// ==========================================
+// INISIALISASI & KONEKSI SUPABASE
+// ==========================================
+document.addEventListener("DOMContentLoaded", async () => {
+  initStorageFallback();
+  await loadDataFromDatabase();
+  renderStudentDropdown();
+  setCurrentDate();
+  setupTextLockProtections();
+  setupEditorAutoUppercase();
+
+  const pinInput = document.getElementById("input-pin-guru");
+  if (pinInput) {
+    pinInput.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        validateTeacherPin();
+      }
+    });
+  }
+
+  switchScreen("screen-menu-utama");
 });
 
-/* ==========================================================================
-   SUPABASE DATA LOADING & MAPPING
-   ========================================================================== */
-async function loadDataFromSupabase() {
-  try {
-    // Ambil data siswa dari Supabase
-    const { data: students, error: studentError } =
-      await supabaseClient
-        .from("students")
-        .select("*")
-        .order("name", { ascending: true });
-
-    if (studentError) throw studentError;
-
-    studentsList = (students || []).map(student => ({
-      id: String(student.id),
-      name: student.name,
-      profile: student.profile || "A"
-    }));
-
-    // Ambil histori hasil belajar dari Supabase
-    const { data: results, error: resultError } =
-      await supabaseClient
-        .from("results")
-        .select("*")
-        .order("id", { ascending: false });
-
-    if (resultError) throw resultError;
-
-    // Konversi format Supabase menjadi format yang digunakan Menu Guru.
-    exerciseResultsHistory = (results || []).map(r => {
-      const main = r.main_result || {};
-      const retry = r.retry_result || null;
-
-      return {
-        id: String(r.id),
-        studentId: String(r.student_id),
-        studentName: r.student_name || "-",
-        date: r.date || "-",
-        class: "SMPLB - SMALB",
-
-        profile: r.package
-          ? String(r.package).charAt(0)
-          : "A",
-
-        materialCode: r.package || "-",
-
-        totalSentences: Number(main.totalSentences || 0),
-
-        primaryResult:
-          `${Number(main.correctCount || 0)}/${Number(main.totalSentences || 0)}`,
-
-        retryResult: retry
-          ? `${Number(retry.correctCount || 0)}/${Number(retry.totalSentences || 0)}`
-          : "-",
-
-        details: Array.isArray(main.details)
-          ? main.details
-          : [],
-
-        retryDetails: retry && Array.isArray(retry.details)
-          ? retry.details
-          : null
-      };
-    });
-
-    console.log("Supabase terhubung.");
-    console.log("Jumlah siswa:", studentsList.length);
-    console.log("Jumlah histori:", exerciseResultsHistory.length);
-
-    populateAbsensiDropdown();
-    renderTeacherTables();
-
-  } catch (error) {
-    console.error("Gagal mengambil data Supabase:", error);
-    alert("Database belum dapat dihubungkan. Periksa koneksi Supabase.");
+function initStorageFallback() {
+  if (!localStorage.getItem(STORAGE_KEY_STUDENTS)) {
+    localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(DEFAULT_STUDENTS));
+  }
+  if (!localStorage.getItem(STORAGE_KEY_HISTORY)) {
+    localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify([]));
   }
 }
 
-/* ==========================================================================
-   NAVIGASI DAN ALUR PANEL
-   ========================================================================== */
-function navigateTo(panelId) {
-  document.querySelectorAll(".view-panel").forEach(panel => {
-    panel.classList.remove("active");
-  });
-
-  const targetPanel = document.getElementById(panelId);
-  if (targetPanel) {
-    targetPanel.classList.add("active");
-  }
-
-  const appViewport = document.getElementById("app-viewport");
-  if (panelId === "view-ketik" || panelId === "view-hasil") {
-    appViewport.classList.add("desktop-wide-view");
-  } else {
-    appViewport.classList.remove("desktop-wide-view");
-  }
-
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-/* ==========================================================================
-   ABSENSI SISWA
-   ========================================================================== */
-function populateAbsensiDropdown() {
-  const selectEl = document.getElementById("student-select");
-  const emptyMsgEl = document.getElementById("absensi-empty-msg");
-  const btnStartEl = document.getElementById("btn-start-session");
-  const detailsEl = document.getElementById("absensi-details");
-
-  if (!selectEl) return;
-
-  selectEl.innerHTML = '<option value="">-- Pilih Nama --</option>';
-
-  if (!studentsList || studentsList.length === 0) {
-    if (emptyMsgEl) emptyMsgEl.classList.remove("hidden");
-    selectEl.disabled = true;
-    if (btnStartEl) btnStartEl.disabled = true;
-    if (detailsEl) detailsEl.classList.add("hidden");
-    return;
-  }
-
-  if (emptyMsgEl) emptyMsgEl.classList.add("hidden");
-  selectEl.disabled = false;
-
-  studentsList.forEach(st => {
-    const opt = document.createElement("option");
-    opt.value = st.id;
-    opt.textContent = st.name;
-    selectEl.appendChild(opt);
-  });
-
-  selectEl.value = "";
-  if (btnStartEl) btnStartEl.disabled = true;
-  if (detailsEl) detailsEl.classList.add("hidden");
-}
-
-function handleStudentSelect() {
-  const selectEl = document.getElementById("student-select");
-  const btnStartEl = document.getElementById("btn-start-session");
-  const detailsEl = document.getElementById("absensi-details");
-  const dateEl = document.getElementById("absensi-date");
-
-  if (selectEl.value) {
-    const student = studentsList.find(s => s.id === selectEl.value);
-    if (student) {
-      const todayDate = new Date().toISOString().split('T')[0];
-
-      if (dateEl) dateEl.textContent = todayDate;
-      activeSession.student = student;
-      activeSession.date = todayDate;
-
-      if (detailsEl) detailsEl.classList.remove("hidden");
-      if (btnStartEl) btnStartEl.disabled = false;
-      return;
-    }
-  }
-
-  if (detailsEl) detailsEl.classList.add("hidden");
-  if (btnStartEl) btnStartEl.disabled = true;
-}
-
-function startExerciseSession() {
-  if (!activeSession.student) return;
-
-  activeSession.isRetryMode = false;
-  activeSession.primaryAssessment = null;
-  activeSession.retryAssessment = null;
-  const typingInput = document.getElementById("typing-input");
-  if (typingInput) typingInput.value = "";
-
-  const profile = activeSession.student.profile || "A";
-  activeSession.packageCode = profile;
-
-  const pack = MATERIAL_PACKAGES[profile] || MATERIAL_PACKAGES["A"];
-  const randomIndex = Math.floor(Math.random() * pack.length);
-  activeSession.material = pack[randomIndex];
-
-  const displayReadingText = document.getElementById("display-reading-text");
-  const referenceText = document.getElementById("reference-text");
-
-  if (displayReadingText) displayReadingText.textContent = activeSession.material.text;
-  if (referenceText) referenceText.textContent = activeSession.material.text;
-
-  navigateTo("view-baca");
-}
-
-/* ==========================================================================
-   EVALUASI TEKS & NORMALISASI MENGETIK
-   ========================================================================== */
-function getSentencesArray(text) {
-  if (!text) return [];
-  return text
-    .split(".")
-    .map(s => s.trim())
-    .filter(s => s.length > 0)
-    .map(s => s + ".");
-}
-
-function normalizeText(text) {
-  if (!text) return "";
-  return text
-    .replace(/[\r\n]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function normalizeForComparison(text) {
-  return normalizeText(text)
-    .toLowerCase()
-    .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "")
-    .trim();
-}
-
-function checkTypingAnswer() {
-  const userRawInput = document.getElementById("typing-input").value;
-  const userCleanInput = normalizeText(userRawInput);
-
-  if (!userCleanInput) {
-    alert("Silakan ketik teks terlebih dahulu.");
-    return;
-  }
-
-  const targetSentences = getSentencesArray(activeSession.material.text);
-  const userSentences = getSentencesArray(userCleanInput);
-
-  let feedbackDetails = [];
-  let correctCount = 0;
-
-  targetSentences.forEach((target, index) => {
-    const userTyped = userSentences[index] || "";
-    
-    const isExactMatch = normalizeText(target).toLowerCase() === normalizeText(userTyped).toLowerCase();
-    const isNoPunctuationMatch = normalizeForComparison(target) === normalizeForComparison(userTyped);
-
-    let status = "partial";
-    if (isExactMatch) {
-      status = "correct";
-      correctCount++;
-    } else if (isNoPunctuationMatch) {
-      status = "partial";
-    }
-
-    feedbackDetails.push({
-      index: index + 1,
-      isCorrect: status === "correct",
-      targetText: target,
-      userText: userTyped
-    });
-  });
-
-  const assessmentResult = {
-    totalSentences: targetSentences.length,
-    correctCount: correctCount,
-    needsImprovementCount: targetSentences.length - correctCount,
-    details: feedbackDetails
-  };
-
-  if (!activeSession.isRetryMode) {
-    activeSession.primaryAssessment = assessmentResult;
-  } else {
-    activeSession.retryAssessment = assessmentResult;
-  }
-
-  saveSessionRecord();
-  renderResultsView();
-  navigateTo("view-hasil");
-}
-
-/* ==========================================================================
-   HASIL LATIHAN
-   ========================================================================== */
-function renderResultsView() {
-  document.getElementById("res-nama").textContent = activeSession.student.name;
-  document.getElementById("res-tanggal").textContent = activeSession.date;
-
-  const primary = activeSession.primaryAssessment;
-  renderFeedbackList("primary-feedback-list", primary.details);
-
-  const retrySectionEl = document.getElementById("retry-result-section");
-  if (activeSession.retryAssessment) {
-    if (retrySectionEl) retrySectionEl.classList.remove("hidden");
-    renderFeedbackList("retry-feedback-list", activeSession.retryAssessment.details);
-  } else {
-    if (retrySectionEl) retrySectionEl.classList.add("hidden");
-  }
-
-  const currentAss = activeSession.retryAssessment || activeSession.primaryAssessment;
-  const motivationEl = document.getElementById("res-motivation-text");
-
-  if (motivationEl) {
-    if (currentAss.correctCount === currentAss.totalSentences) {
-      motivationEl.textContent = "🎉 Bagus sekali! Kamu sudah menyalin seluruh teks dengan sangat teliti dan rapi. Pertahankan ya!";
-    } else {
-      motivationEl.textContent = "😊 Bagus! Kamu sudah berusaha dengan baik. Coba perhatikan kembali bagian yang perlu diperbaiki agar semakin rapi.";
-    }
-  }
-}
-
-function renderFeedbackList(containerId, details) {
-  const container = document.getElementById(containerId);
-  if (!container) return;
-  container.innerHTML = "";
-
-  details.forEach(item => {
-    const div = document.createElement("div");
-    div.className = `feedback-item ${item.isCorrect ? 'feedback-correct' : 'feedback-partial'}`;
-
-    const statusText = item.isCorrect 
-      ? `🟢 Kalimat ${item.index} — Benar` 
-      : `🟡 Kalimat ${item.index} — Perlu diperbaiki`;
-
-    div.innerHTML = `
-      <div class="feedback-status">${statusText}</div>
-      <div class="feedback-target">"${item.targetText}"</div>
-    `;
-
-    container.appendChild(div);
-  });
-}
-
-async function saveSessionRecord() {
-  const payload = {
-    student_id: activeSession.student.id,
-    student_name: activeSession.student.name,
-    date: activeSession.date,
-    package: activeSession.material.code,
-    main_result: activeSession.primaryAssessment,
-    retry_result: activeSession.retryAssessment
-  };
+async function loadDataFromDatabase() {
+  if (!supabaseClient) return;
 
   try {
-    const { data, error } = await supabaseClient
+    // Sync Data Siswa
+    const { data: dbStudents, error: stdError } = await supabaseClient
+      .from("students")
+      .select("*")
+      .order("name", { ascending: true });
+
+    if (!stdError && dbStudents && dbStudents.length > 0) {
+      const formatted = dbStudents.map(s => ({
+        id: String(s.id),
+        name: s.name,
+        profile: s.profile || "A"
+      }));
+      localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(formatted));
+    }
+
+    // Sync Data Histori
+    const { data: dbResults, error: resError } = await supabaseClient
       .from("results")
-      .insert([payload]);
+      .select("*")
+      .order("id", { ascending: false });
 
-    if (error) throw error;
-    console.log("Berhasil menyimpan hasil ke Supabase:", data);
-    
-    // Refresh data dari database
-    await loadDataFromSupabase();
+    if (!resError && dbResults) {
+      localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(dbResults));
+    }
   } catch (err) {
-    console.error("Gagal menyimpan hasil ke Supabase:", err);
+    console.warn("Gagal sinkronisasi Supabase. Menggunakan LocalStorage:", err);
   }
 }
 
-function startRetrySession() {
-  activeSession.isRetryMode = true;
-  const typingInput = document.getElementById("typing-input");
-  if (typingInput) typingInput.value = "";
-  navigateTo("view-ketik");
+function getStudents() {
+  return JSON.parse(localStorage.getItem(STORAGE_KEY_STUDENTS)) || [];
 }
 
-function finishSessionAndReset() {
-  activeSession = {
-    student: null,
-    date: "",
-    packageCode: "A",
-    material: null,
-    primaryAssessment: null,
-    retryAssessment: null,
-    isRetryMode: false
+function saveStudentsLocal(data) {
+  localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(data));
+}
+
+function getHistory() {
+  return JSON.parse(localStorage.getItem(STORAGE_KEY_HISTORY)) || [];
+}
+
+function saveHistoryLocal(data) {
+  localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(data));
+}
+
+function setCurrentDate() {
+  const today = new Date();
+  const options = { day: 'numeric', month: 'long', year: 'numeric' };
+  const dateStr = today.toLocaleDateString('id-ID', options);
+  const inputDate = document.getElementById("input-tanggal");
+  if (inputDate) inputDate.value = dateStr;
+  currentSession.date = dateStr;
+}
+
+// ==========================================
+// PROTEKSI PENGUNCIAN TEKS SUMBER
+// ==========================================
+function setupTextLockProtections() {
+  const targetTextDisplay = document.getElementById("target-text-display");
+  const readingTextDisplay = document.getElementById("baca-teks-content");
+
+  const lockElements = [targetTextDisplay, readingTextDisplay];
+
+  lockElements.forEach(el => {
+    if (!el) return;
+
+    el.addEventListener("contextmenu", (e) => e.preventDefault());
+    el.addEventListener("copy", (e) => e.preventDefault());
+    el.addEventListener("cut", (e) => e.preventDefault());
+    el.addEventListener("dragstart", (e) => e.preventDefault());
+    el.addEventListener("drop", (e) => e.preventDefault());
+  });
+}
+
+// ==========================================
+// AUTOMATIC UPPERCASE KHUSUS PAKET A
+// ==========================================
+function setupEditorAutoUppercase() {
+  const editor = document.getElementById("typing-editor");
+  if (!editor) return;
+
+  editor.addEventListener("input", () => {
+    if (currentSession.profile === "A") {
+      const selection = window.getSelection();
+      const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+      const startOffset = range ? range.startOffset : 0;
+
+      const upperText = editor.innerText.toUpperCase();
+      if (editor.innerText !== upperText) {
+        editor.innerText = upperText;
+
+        try {
+          const newRange = document.createRange();
+          const textNode = editor.firstChild || editor;
+          const maxLen = textNode.length || 0;
+          newRange.setStart(textNode, Math.min(startOffset, maxLen));
+          newRange.collapse(true);
+          selection.removeAllRanges();
+          selection.addRange(newRange);
+        } catch (err) {
+          const newRange = document.createRange();
+          newRange.selectNodeContents(editor);
+          newRange.collapse(false);
+          selection.removeAllRanges();
+          selection.addRange(newRange);
+        }
+      }
+    }
+  });
+}
+
+// ==========================================
+// KONTROL NAVIGASI SCREEN
+// ==========================================
+function switchScreen(screenId) {
+  const allScreens = document.querySelectorAll(".view-panel");
+  allScreens.forEach(s => s.classList.remove("active"));
+
+  const target = document.getElementById(screenId);
+  if (target) {
+    target.classList.add("active");
+    window.scrollTo(0, 0);
+  }
+
+  if (screenId === "screen-ayo-mengetik") {
+    document.body.classList.add("screen-docuslate-active");
+  } else {
+    document.body.classList.remove("screen-docuslate-active");
+  }
+}
+
+function renderStudentDropdown() {
+  const select = document.getElementById("select-siswa");
+  if (!select) return;
+  select.innerHTML = '<option value="">-- Pilih Nama Siswa --</option>';
+  const students = getStudents();
+  students.forEach(s => {
+    const opt = document.createElement("option");
+    opt.value = s.id;
+    opt.textContent = s.name;
+    select.appendChild(opt);
+  });
+}
+
+// ==========================================
+// ALUR SEKUENSIS BELAJAR
+// ==========================================
+function startSession() {
+  const studentId = document.getElementById("select-siswa").value;
+  if (!studentId) {
+    alert("Silakan pilih nama siswa terlebih dahulu!");
+    return;
+  }
+
+  const students = getStudents();
+  const student = students.find(s => s.id === studentId);
+  if (!student) return;
+
+  currentSession.studentId = student.id;
+  currentSession.studentName = student.name;
+  currentSession.profile = student.profile || "A";
+  currentSession.isRetry = false;
+  currentSession.mainResultRecord = null;
+
+  document.body.classList.remove("package-a-active", "package-c-active");
+  if (currentSession.profile === "A") {
+    document.body.classList.add("package-a-active");
+  } else if (currentSession.profile === "C") {
+    document.body.classList.add("package-c-active");
+  }
+
+  const packageList = MATERIAL_PACKAGES[currentSession.profile] || MATERIAL_PACKAGES["A"];
+  const randomIndex = Math.floor(Math.random() * packageList.length);
+  const selectedMaterial = packageList[randomIndex];
+  
+  currentSession.targetSentences = selectedMaterial.sentences;
+
+  const previewBox = document.getElementById("baca-teks-content");
+  previewBox.textContent = currentSession.targetSentences.join("\n");
+
+  switchScreen("screen-baca-teks");
+}
+
+function goToMengetik() {
+  document.getElementById("ds-student-name").textContent = currentSession.studentName;
+  document.getElementById("ds-date").textContent = currentSession.date;
+
+  const targetDisplay = document.getElementById("target-text-display");
+  targetDisplay.textContent = currentSession.targetSentences.join("\n");
+
+  const editor = document.getElementById("typing-editor");
+  editor.innerHTML = "";
+
+  switchScreen("screen-ayo-mengetik");
+}
+
+// ==========================================
+// TOOLBAR MINI DOCUSLATE
+// ==========================================
+function executeDocCommand(cmd) {
+  document.execCommand(cmd, false, null);
+  const editor = document.getElementById("typing-editor");
+  if (editor) editor.focus();
+}
+
+function changeFontSize(delta) {
+  const editor = document.getElementById("typing-editor");
+  const currentSize = window.getComputedStyle(editor).fontSize;
+  let newSize = parseFloat(currentSize) + (delta * 2);
+  if (newSize >= 14 && newSize <= 32) {
+    editor.style.fontSize = newSize + "px";
+  }
+}
+
+// ==========================================
+// LOGIKA PENILAIAN & AKUMULASI HASIL SUPABASE
+// ==========================================
+function normalizeText(str) {
+  if (!str) return "";
+  return str.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+async function checkTypingResult() {
+  const editor = document.getElementById("typing-editor");
+  let userRawInput = editor.innerText || editor.textContent || "";
+  
+  if (currentSession.profile === "A") {
+    userRawInput = userRawInput.toUpperCase();
+  }
+
+  const normalizedUser = normalizeText(userRawInput);
+
+  if (!normalizedUser) {
+    alert("Area mengetik masih kosong. Silakan ketik kalimat terlebih dahulu!");
+    return;
+  }
+
+  const targets = currentSession.targetSentences;
+  let correctCount = 0;
+  let wrongCount = 0;
+  let sentenceEvaluations = [];
+  let remainingUserText = normalizedUser;
+
+  targets.forEach((targetSentence, idx) => {
+    const normTarget = normalizeText(targetSentence);
+    if (remainingUserText.includes(normTarget)) {
+      correctCount++;
+      sentenceEvaluations.push({ index: idx + 1, target: targetSentence, isCorrect: true });
+      remainingUserText = remainingUserText.replace(normTarget, "").trim();
+    } else {
+      wrongCount++;
+      sentenceEvaluations.push({ index: idx + 1, target: targetSentence, isCorrect: false });
+    }
+  });
+
+  const recordPayload = {
+    id: (currentSession.isRetry ? "hist_retry_" : "hist_") + Date.now(),
+    date: currentSession.date,
+    studentName: currentSession.studentName,
+    studentId: currentSession.studentId,
+    sessionType: currentSession.isRetry ? "PERBAIKAN (RETRY)" : "UTAMA",
+    correct: correctCount,
+    total: targets.length,
+    details: sentenceEvaluations
   };
 
-  populateAbsensiDropdown();
-  navigateTo("view-home");
+  const history = getHistory();
+  history.push(recordPayload);
+  saveHistoryLocal(history);
+
+  if (supabaseClient) {
+    try {
+      await supabaseClient.from("results").insert([{
+        student_id: currentSession.studentId,
+        student_name: currentSession.studentName,
+        date: new Date().toISOString().split("T")[0],
+        session_type: recordPayload.sessionType,
+        correct_count: correctCount,
+        total_count: targets.length,
+        details_json: sentenceEvaluations
+      }]);
+    } catch (dbErr) {
+      console.warn("Gagal menyimpan ke Supabase (Tersimpan di LocalStorage):", dbErr);
+    }
+  }
+
+  renderResultScreen(correctCount, wrongCount, sentenceEvaluations);
+  switchScreen("screen-hasil-latihan");
 }
 
-/* ==========================================================================
-   KEAMANAN PIN & MENU GURU
-   ========================================================================== */
-function promptTeacherPin() {
-  const pinInput = document.getElementById("pin-input");
-  if (pinInput) pinInput.value = "";
-  const errEl = document.getElementById("pin-error-msg");
-  if (errEl) errEl.classList.add("hidden");
+function renderResultScreen(correct, wrong, evaluations) {
+  document.getElementById("res-nama").textContent = currentSession.studentName;
+  document.getElementById("res-tanggal").textContent = currentSession.date;
   
-  const modalPin = document.getElementById("modal-pin");
-  if (modalPin) modalPin.classList.remove("hidden");
-  
-  setTimeout(() => {
-    if (pinInput) pinInput.focus();
-  }, 100);
-}
-
-function handlePinSubmit(event) {
-  if (event) event.preventDefault();
-  
-  const pinInput = document.getElementById("pin-input");
-  const inputPin = pinInput ? pinInput.value.trim() : "";
-  
-  if (inputPin === TEACHER_PIN) {
-    const modalPin = document.getElementById("modal-pin");
-    if (modalPin) modalPin.classList.add("hidden");
-    navigateTo("view-guru");
+  const statusPill = document.getElementById("res-status-pill");
+  if (currentSession.isRetry) {
+    statusPill.textContent = "HASIL LATIHAN PERBAIKAN";
+    statusPill.style.backgroundColor = "var(--warning-yellow)";
   } else {
-    const errorMsg = document.getElementById("pin-error-msg");
+    statusPill.textContent = "HASIL PENILAIAN UTAMA";
+    statusPill.style.backgroundColor = "var(--primary-purple)";
+  }
+
+  const listContainer = document.getElementById("result-sentences-list");
+  listContainer.innerHTML = "";
+
+  evaluations.forEach(item => {
+    const div = document.createElement("div");
+    div.className = `sentence-item ${item.isCorrect ? 'correct' : 'wrong'}`;
+    div.innerHTML = `
+      <div class="sentence-header">
+        <span>Kalimat ${item.index}</span>
+        <span>${item.isCorrect ? '✓ BENAR' : '⚠️ PERLU DIPERBAIKI'}</span>
+      </div>
+      <div class="sentence-text">${item.target}</div>
+    `;
+    listContainer.appendChild(div);
+  });
+
+  const motivationBox = document.getElementById("res-motivation-text");
+  if (wrong === 0) {
+    motivationBox.textContent = "🎉 Bagus sekali! Kamu sudah menyalin seluruh teks dengan sangat teliti dan rapi. Pertahankan ya!";
+  } else if (correct > 0) {
+    motivationBox.textContent = "😊 Bagus! Kamu sudah berusaha dengan baik. Coba perhatikan kembali bagian yang perlu diperbaiki agar semakin rapi.";
+  } else {
+    motivationBox.textContent = "💪 TETAP SEMANGAT! Mari kita latihan lagi perlahan-lahan ya.";
+  }
+}
+
+function retryExercise() {
+  currentSession.isRetry = true;
+  goToMengetik();
+}
+
+function finishSession() {
+  document.body.classList.remove("package-a-active", "package-c-active");
+  currentSession = {
+    studentId: null,
+    studentName: "",
+    profile: "A",
+    date: currentSession.date,
+    targetSentences: [],
+    isRetry: false,
+    mainResultRecord: null
+  };
+  switchScreen("screen-menu-utama");
+}
+
+// ==========================================
+// MENU GURU & MODAL PIN
+// ==========================================
+function openTeacherPinModal() {
+  const pinInput = document.getElementById("input-pin-guru");
+  const errorMsg = document.getElementById("pin-error-msg");
+  if (pinInput) pinInput.value = "";
+  if (errorMsg) errorMsg.classList.add("hidden");
+  
+  const modal = document.getElementById("modal-pin");
+  if (modal) modal.classList.remove("hidden");
+  
+  setTimeout(() => { if (pinInput) pinInput.focus(); }, 100);
+}
+
+function closeTeacherPinModal() {
+  const modal = document.getElementById("modal-pin");
+  const errorMsg = document.getElementById("pin-error-msg");
+  const pinInput = document.getElementById("input-pin-guru");
+
+  if (errorMsg) errorMsg.classList.add("hidden");
+  if (pinInput) pinInput.value = "";
+  if (modal) modal.classList.add("hidden");
+}
+
+function validateTeacherPin() {
+  const pinInput = document.getElementById("input-pin-guru");
+  const errorMsg = document.getElementById("pin-error-msg");
+  const inputPin = pinInput ? pinInput.value.trim() : "";
+
+  if (inputPin === TEACHER_PIN) {
+    closeTeacherPinModal();
+    renderTeacherData();
+    switchScreen("screen-menu-guru");
+  } else {
     if (errorMsg) errorMsg.classList.remove("hidden");
     if (pinInput) {
       pinInput.value = "";
@@ -456,279 +513,126 @@ function handlePinSubmit(event) {
   }
 }
 
-function closePinModal() {
-  const modalPin = document.getElementById("modal-pin");
-  if (modalPin) modalPin.classList.add("hidden");
-}
+function switchTeacherTab(tab) {
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+  document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
 
-function switchTeacherTab(tabName) {
-  document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
-  document.querySelectorAll(".tab-content").forEach(content => content.classList.remove("active"));
-
-  if (tabName === 'students') {
-    const btnSt = document.getElementById("tab-btn-students");
-    const tabSt = document.getElementById("teacher-tab-students");
-    if (btnSt) btnSt.classList.add("active");
-    if (tabSt) tabSt.classList.add("active");
+  if (tab === 'siswa') {
+    document.getElementById("tab-btn-siswa").classList.add("active");
+    document.getElementById("teacher-tab-siswa").classList.add("active");
   } else {
-    const btnRes = document.getElementById("tab-btn-results");
-    const tabRes = document.getElementById("teacher-tab-results");
-    if (btnRes) btnRes.classList.add("active");
-    if (tabRes) tabRes.classList.add("active");
+    document.getElementById("tab-btn-histori").classList.add("active");
+    document.getElementById("teacher-tab-histori").classList.add("active");
   }
 }
 
-function renderTeacherTables() {
-  // 1. DATA SISWA
-  const studentBody = document.getElementById("student-table-body");
-  if (studentBody) {
-    studentBody.innerHTML = "";
+function renderTeacherData() {
+  const studentTbody = document.getElementById("student-table-body");
+  studentTbody.innerHTML = "";
+  const students = getStudents();
 
-    if (!studentsList || studentsList.length === 0) {
-      studentBody.innerHTML = `<tr><td colspan="3" class="text-center" style="color:var(--text-muted)">Belum ada data siswa.</td></tr>`;
-    } else {
-      studentsList.forEach(s => {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td><strong>${s.name}</strong></td>
-          <td>Profil ${s.profile}</td>
-          <td>
-            <button class="btn btn-secondary btn-sm" onclick="editStudent('${s.id}')">✏️ Edit</button>
-            <button class="btn btn-secondary btn-sm" style="color:var(--danger-red)" onclick="deleteStudent('${s.id}')">🗑️ Hapus</button>
-          </td>
-        `;
-        studentBody.appendChild(tr);
-      });
-    }
-  }
+  students.forEach((s, idx) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${idx + 1}</td>
+      <td><strong>${s.name}</strong> (Profil ${s.profile})</td>
+      <td>
+        <button class="btn btn-secondary btn-sm" style="color:var(--danger-red)" onclick="deleteStudent('${s.id}')">🗑️ Hapus</button>
+      </td>
+    `;
+    studentTbody.appendChild(tr);
+  });
 
-  // 2. HISTORI HASIL BELAJAR
-  const resultsBody = document.getElementById("results-table-body");
-  if (resultsBody) {
-    resultsBody.innerHTML = "";
+  const historyTbody = document.getElementById("history-table-body");
+  historyTbody.innerHTML = "";
+  const history = getHistory();
 
-    if (!exerciseResultsHistory || exerciseResultsHistory.length === 0) {
-      resultsBody.innerHTML = `<tr><td colspan="6" class="text-center" style="color:var(--text-muted)">Belum ada histori hasil belajar.</td></tr>`;
-    } else {
-      exerciseResultsHistory.forEach((r, idx) => {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td>${r.date}</td>
-          <td><strong>${r.studentName}</strong></td>
-          <td>${r.totalSentences} Kalimat</td>
-          <td><span style="color:var(--success-green); font-weight:bold">${r.primaryResult}</span> Benar</td>
-          <td>${r.retryResult !== '-' ? `<span style="color:var(--primary-purple); font-weight:bold">${r.retryResult}</span> Benar` : '-'}</td>
-          <td>
-            <div class="action-btn-group">
-              <button class="btn btn-secondary btn-sm" onclick="viewHistoryDetail(${idx})">👁️</button>
-              <button class="btn btn-secondary btn-sm" onclick="openHistoryEdit(${idx})">✏️</button>
-              <button class="btn btn-secondary btn-sm" style="color:var(--danger-red)" onclick="deleteHistoryRecord(${idx})">🗑️</button>
-            </div>
-          </td>
-        `;
-        resultsBody.appendChild(tr);
-      });
-    }
+  if (history.length === 0) {
+    historyTbody.innerHTML = '<tr><td colspan="5" class="text-center" style="color:var(--text-muted)">Belum ada histori latihan.</td></tr>';
+  } else {
+    const reversedHistory = [...history].reverse();
+    reversedHistory.forEach((h) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${h.date}</td>
+        <td>${h.studentName}</td>
+        <td><small>${h.sessionType || 'UTAMA'}</small></td>
+        <td><strong>${h.correct} / ${h.total}</strong></td>
+        <td>
+          <button class="btn btn-secondary btn-sm" style="color:var(--danger-red)" onclick="deleteHistoryItem('${h.id}')">🗑️ Hapus</button>
+        </td>
+      `;
+      historyTbody.appendChild(tr);
+    });
   }
 }
 
-/* SISWA CRUD */
-function openStudentForm() {
-  document.getElementById("form-title").textContent = "Tambah Siswa Baru";
-  document.getElementById("edit-student-id").value = "";
-  document.getElementById("input-student-name").value = "";
-  document.getElementById("input-student-profile").value = "A";
-  document.getElementById("student-form-box").classList.remove("hidden");
-  document.getElementById("input-student-name").focus();
-}
-
-function closeStudentForm() {
-  document.getElementById("student-form-box").classList.add("hidden");
-}
-
-async function saveStudentData() {
-  const id = document.getElementById("edit-student-id").value;
-  const name = document.getElementById("input-student-name").value.trim();
-  const profile = document.getElementById("input-student-profile").value;
+async function addNewStudent() {
+  const nameInput = document.getElementById("add-student-name");
+  const profileSelect = document.getElementById("add-student-profile");
+  const name = nameInput.value.trim();
+  const profile = profileSelect.value;
 
   if (!name) {
-    alert("Nama siswa tidak boleh kosong.");
+    alert("Masukkan nama siswa terlebih dahulu!");
     return;
   }
 
-  try {
-    if (id) {
-      const { error } = await supabaseClient
-        .from("students")
-        .update({ name, profile })
-        .eq("id", id);
-      if (error) throw error;
-    } else {
-      const { error } = await supabaseClient
-        .from("students")
-        .insert([{ name, profile }]);
-      if (error) throw error;
+  const newStudent = {
+    id: "std_" + Date.now(),
+    name: name,
+    profile: profile
+  };
+
+  const students = getStudents();
+  students.push(newStudent);
+  saveStudentsLocal(students);
+
+  if (supabaseClient) {
+    try {
+      await supabaseClient.from("students").insert([{ name: name, profile: profile }]);
+    } catch (e) {
+      console.warn("Gagal simpan ke DB:", e);
     }
-
-    await loadDataFromSupabase();
-    closeStudentForm();
-  } catch (err) {
-    console.error("Gagal menyimpan data siswa ke Supabase:", err);
-    alert("Gagal menyimpan data siswa.");
   }
-}
 
-function editStudent(id) {
-  const student = studentsList.find(s => s.id === id);
-  if (!student) return;
-
-  document.getElementById("form-title").textContent = "Edit Data Siswa";
-  document.getElementById("edit-student-id").value = student.id;
-  document.getElementById("input-student-name").value = student.name;
-  document.getElementById("input-student-profile").value = student.profile;
-  document.getElementById("student-form-box").classList.remove("hidden");
+  nameInput.value = "";
+  renderStudentDropdown();
+  renderTeacherData();
 }
 
 async function deleteStudent(id) {
-  const student = studentsList.find(s => s.id === id);
-  if (!student) return;
+  if (confirm("Apakah Anda yakin ingin menghapus data siswa ini?")) {
+    let students = getStudents();
+    const targetStudent = students.find(s => s.id === id);
+    students = students.filter(s => s.id !== id);
+    saveStudentsLocal(students);
 
-  if (confirm(`Apakah Anda yakin ingin menghapus siswa "${student.name}"?\n(Riwayat hasil belajar siswa ini akan tetap ada).`)) {
-    try {
-      const { error } = await supabaseClient
-        .from("students")
-        .delete()
-        .eq("id", id);
-
-      if (error) throw error;
-      await loadDataFromSupabase();
-    } catch (err) {
-      console.error("Gagal menghapus siswa:", err);
-      alert("Gagal menghapus data siswa.");
+    if (supabaseClient && targetStudent) {
+      try {
+        await supabaseClient.from("students").delete().eq("name", targetStudent.name);
+      } catch (e) {
+        console.warn("Gagal hapus dari DB:", e);
+      }
     }
+
+    renderStudentDropdown();
+    renderTeacherData();
   }
 }
 
-/* HISTORI CRUD & DETAIL */
-function viewHistoryDetail(index) {
-  const record = exerciseResultsHistory[index];
-  if (!record) return;
-
-  const contentEl = document.getElementById("modal-detail-content");
-  let primaryDetailsHtml = "";
-  if (record.details) {
-    record.details.forEach(item => {
-      primaryDetailsHtml += `<p style="margin-bottom:6px;">${item.isCorrect ? '🟢' : '🟡'} <strong>Kalimat ${item.index}:</strong> "${item.targetText}"</p>`;
-    });
-  }
-
-  if (contentEl) {
-    contentEl.innerHTML = `
-      <p><strong>Nama:</strong> ${record.studentName}</p>
-      <p><strong>Tanggal:</strong> ${record.date}</p>
-      <p><strong>Penilaian Utama:</strong> ${record.primaryResult}</p>
-      <p><strong>Latihan Perbaikan:</strong> ${record.retryResult}</p>
-      <hr style="margin:12px 0; border:0; border-top:1px solid #DFE6E9;">
-      <h4 style="color:var(--primary-purple); margin-bottom:8px;">Rincian Kalimat:</h4>
-      ${primaryDetailsHtml}
-    `;
-  }
-
-  const modalDetail = document.getElementById("modal-detail");
-  if (modalDetail) modalDetail.classList.remove("hidden");
-}
-
-function closeDetailModal() {
-  const modalDetail = document.getElementById("modal-detail");
-  if (modalDetail) modalDetail.classList.add("hidden");
-}
-
-function openHistoryEdit(index) {
-  const record = exerciseResultsHistory[index];
-  if (!record) return;
-
-  document.getElementById("edit-history-id").value = record.id;
-  document.getElementById("edit-history-student").value = record.studentName;
-  document.getElementById("edit-history-primary").value = record.primaryResult;
-  document.getElementById("edit-history-retry").value = record.retryResult;
-
-  document.getElementById("history-edit-box").classList.remove("hidden");
-}
-
-function closeHistoryEdit() {
-  document.getElementById("history-edit-box").classList.add("hidden");
-}
-
-async function saveHistoryEdit() {
-  const recordId = document.getElementById("edit-history-id").value;
-  const newPrimaryStr = document.getElementById("edit-history-primary").value.trim();
-  const newRetryStr = document.getElementById("edit-history-retry").value.trim();
-
-  const record = exerciseResultsHistory.find(r => r.id === recordId);
-  if (!record) return;
-
-  // Parse hasil perbaikan / penilaian utama sederhana
-  const parseResult = (str, fallbackTotal) => {
-    const parts = str.split('/');
-    if (parts.length === 2) {
-      return { correctCount: parseInt(parts[0]) || 0, totalSentences: parseInt(parts[1]) || fallbackTotal };
-    }
-    return null;
-  };
-
-  const updatedMain = parseResult(newPrimaryStr, record.totalSentences);
-  const updatedRetry = newRetryStr !== '-' ? parseResult(newRetryStr, record.totalSentences) : null;
-
-  try {
-    const updatePayload = {};
-    if (updatedMain) {
-      updatePayload.main_result = {
-        totalSentences: updatedMain.totalSentences,
-        correctCount: updatedMain.correctCount,
-        needsImprovementCount: updatedMain.totalSentences - updatedMain.correctCount,
-        details: record.details
-      };
-    }
-    if (updatedRetry !== undefined) {
-      updatePayload.retry_result = updatedRetry ? {
-        totalSentences: updatedRetry.totalSentences,
-        correctCount: updatedRetry.correctCount,
-        needsImprovementCount: updatedRetry.totalSentences - updatedRetry.correctCount,
-        details: record.retryDetails || []
-      } : null;
-    }
-
-    const { error } = await supabaseClient
-      .from("results")
-      .update(updatePayload)
-      .eq("id", recordId);
-
-    if (error) throw error;
-
-    await loadDataFromSupabase();
-    closeHistoryEdit();
-  } catch (err) {
-    console.error("Gagal mengedit histori:", err);
-    alert("Gagal menyimpan perubahan histori.");
+function deleteHistoryItem(id) {
+  if (confirm("Hapus catatan histori ini?")) {
+    let history = getHistory();
+    history = history.filter(h => h.id !== id);
+    saveHistoryLocal(history);
+    renderTeacherData();
   }
 }
 
-async function deleteHistoryRecord(index) {
-  const record = exerciseResultsHistory[index];
-  if (!record) return;
-
-  if (confirm("Apakah Anda yakin ingin menghapus histori hasil belajar ini?")) {
-    try {
-      const { error } = await supabaseClient
-        .from("results")
-        .delete()
-        .eq("id", record.id);
-
-      if (error) throw error;
-      await loadDataFromSupabase();
-    } catch (err) {
-      console.error("Gagal menghapus histori:", err);
-      alert("Gagal menghapus histori hasil belajar.");
-    }
+function clearHistory() {
+  if (confirm("Apakah Anda yakin ingin MENGHAPUS SELURUH HISTORI pembelajaran?")) {
+    saveHistoryLocal([]);
+    renderTeacherData();
   }
 }

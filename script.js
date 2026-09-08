@@ -33,15 +33,13 @@ const MATERIAL_PACKAGES = {
       sentences: [
         "abu vulkanik dapat mengganggu pernapasan.",
         "gunakan masker saat berada di luar rumah.",
-        "gunakan pelindung mata jika abu banyak."
-      ]
+       ]
     },
     {
       id: "B2",
       sentences: [
-        "erupsi gunung anak krakatau masih dipantau.",
         "abu vulkanik dapat terbawa angin.",
-        "masyarakat perlu mengikuti informasi resmi."
+        "gunakan pelindung mata jika abu banyak."
       ]
     }
   ],
